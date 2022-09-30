@@ -11,11 +11,10 @@ public class Cracking
     /// The algorithm used for encryption.
     /// Must be exactly the same algorithm that was used to encrypt the passwords in the password file
     /// </summary>
-    private readonly HashAlgorithm _messageDigest;
 
     public Cracking()
     {
-        _messageDigest = new SHA1CryptoServiceProvider();
+        //_messageDigest = new SHA1CryptoServiceProvider();
         //_messageDigest = new MD5CryptoServiceProvider();
         // seems to be same speed
     }
@@ -26,14 +25,17 @@ public class Cracking
     public List<UserInfoClearText> RunCracking(List<UserInfo> userInfos, List<string> strings)
     {
         Stopwatch stopwatch = Stopwatch.StartNew();
-
+        List<Task<IEnumerable<UserInfoClearText>>> tasks = new();
         Console.WriteLine("passwd opeend");
-
         List<UserInfoClearText> result = new List<UserInfoClearText>();
         foreach (string info in strings)
         {
-            IEnumerable<UserInfoClearText> partialResult = CheckWordWithVariations(info, userInfos);            
-            result.AddRange(partialResult);
+            tasks.Add(Task.Run(() => CheckWordWithVariations(new(info), userInfos)));
+        }
+        Task.WaitAll(tasks.ToArray());
+        foreach(var item in tasks)
+        {
+            result.AddRange(item.Result);
         }
         stopwatch.Stop();
         Console.WriteLine(string.Join(", ", result));
@@ -106,7 +108,7 @@ public class Cracking
     {
         char[] charArray = possiblePassword.ToCharArray();
         byte[] passwordAsBytes = Array.ConvertAll(charArray, PasswordFileHandler.GetConverter());
-
+        HashAlgorithm _messageDigest = new SHA1CryptoServiceProvider();
         byte[] encryptedPassword = _messageDigest.ComputeHash(passwordAsBytes);
         //string encryptedPasswordBase64 = System.Convert.ToBase64String(encryptedPassword);
 
@@ -120,6 +122,7 @@ public class Cracking
                 Console.WriteLine(userInfo.Username + " " + possiblePassword);
             }
         }
+        _messageDigest.Dispose();
         return results;
     }
 
